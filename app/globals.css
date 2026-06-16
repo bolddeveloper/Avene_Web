@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --coral-50: #fff5f5;
+  --coral-100: #ffe0e0;
+  --coral-200: #ffc2c2;
+  --coral-300: #ff9b9b;
+  --coral-400: #f87171;
+  --coral-500: #ef4444;
+  --coral-600: #dc2626;
+
+  --beige-50: #faf7f2;
+  --beige-100: #f5efe5;
+  --beige-200: #e8dcc8;
+  --beige-300: #d8c4a8;
+}
+
+body {
+  color: #333;
+  background-color: #fff;
+}
+
+/* global.css o componente.module.css */
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE y Edge */
+  scrollbar-width: none;     /* Firefox */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;             /* Chrome, Safari y Opera */
+}
