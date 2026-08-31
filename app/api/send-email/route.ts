@@ -3,12 +3,15 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { sanitizeInput, validateEmail } from "@/lib/sanitize";
+import { isValidRequestOrigin } from "@/lib/validate-origin";
+import { verifyTurnstileToken } from "@/lib/verify-turnstile";
 
 const contactSchema = z.object({
   firstName: z.string().min(1, "First name is required").max(100),
   lastName: z.string().min(1, "Last name is required").max(100),
   email: z.string().email("Invalid email format").max(254),
   message: z.string().min(1, "Message is required").max(5000),
+  turnstileToken: z.string().min(1, "Security verification is required"),
 });
 
 function getResendClient() {
@@ -20,10 +23,7 @@ function getResendClient() {
 }
 
 export async function POST(req: Request) {
-  const origin = req.headers.get("origin");
-  const allowedOrigins = [env.NEXT_PUBLIC_SITE_URL, "https://avene.guatemala.com"].filter(Boolean);
-  
-  if (origin && !allowedOrigins.some(o => origin.includes(o))) {
+  if (!isValidRequestOrigin(req)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -42,10 +42,18 @@ export async function POST(req: Request) {
     );
   }
 
-  const { firstName, lastName, email, message } = parsed.data;
+  const { firstName, lastName, email, message, turnstileToken } = parsed.data;
 
   if (!validateEmail(email)) {
     return NextResponse.json({ error: "Invalid email" }, { status: 400 });
+  }
+
+  const isHuman = await verifyTurnstileToken(turnstileToken);
+  if (!isHuman) {
+    return NextResponse.json(
+      { error: "Security verification failed" },
+      { status: 403 }
+    );
   }
 
   const sanitizedFirstName = sanitizeInput(firstName);

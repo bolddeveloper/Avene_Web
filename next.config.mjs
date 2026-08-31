@@ -10,6 +10,7 @@ const nextConfig = {
     unoptimized: true,
   },
   reactStrictMode: true,
+  poweredByHeader: false,
   images: {
     domains: ["avene.com.gt", "www.avene.com.gt"],
   },

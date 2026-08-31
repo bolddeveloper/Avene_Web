@@ -46,6 +46,15 @@ export default [
     },
   },
   {
-    ignores: ["**/node_modules/**", "**/.next/**", "**/out/**", "**/build/**"],
+    ignores: [
+      "**/node_modules/**",
+      "**/.next/**",
+      "**/out/**",
+      "**/build/**",
+      // Root-level tooling config, not part of the app's TS/React source.
+      "next.config.mjs",
+      "next-sitemap.config.js",
+      "postcss.config.mjs",
+    ],
   },
 ];

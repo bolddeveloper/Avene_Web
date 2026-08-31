@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Facebook, Instagram, Youtube } from 'lucide-react'  
 import Header from "@/components/header";
 import Footer from "@/components/footer";
+import TurnstileWidget from "@/components/turnstile";
 import { redes } from "@/app/data/redes";
 
 export default function ContactPage() {
@@ -23,6 +24,8 @@ export default function ContactPage() {
   
   const [successMessage, setSuccessMessage] = useState("");
   const [accepted, setAccepted] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileKey, setTurnstileKey] = useState(0);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -39,13 +42,18 @@ export default function ContactPage() {
       return;
     }
 
+    if (!turnstileToken) {
+      setSuccessMessage("Por favor completa la verificación de seguridad.");
+      return;
+    }
+
     try {
       const res = await fetch("/api/send-email", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, turnstileToken }),
       });
 
       if (res.ok) {
@@ -57,6 +65,9 @@ export default function ContactPage() {
       }
     } catch {
       setSuccessMessage("Ocurrió un error inesperado.");
+    } finally {
+      setTurnstileToken("");
+      setTurnstileKey((key) => key + 1);
     }
   };
 
@@ -148,13 +159,22 @@ export default function ContactPage() {
                   <p className="mt-2 text-xs text-gray-400 mt-5 mb-5">* Campos obligatorios</p>
                 </div>
 
+                <div className="mb-4">
+                  <TurnstileWidget
+                    key={turnstileKey}
+                    onVerify={setTurnstileToken}
+                    onExpire={() => setTurnstileToken("")}
+                  />
+                </div>
+
                 {successMessage && (
                   <p className="text-green-600 text-sm mb-4">{successMessage}</p>
                 )}
 
                 <button
                   type="submit"
-                  className="w-full bg-[#f26b50] text-white py-3 rounded-lg hover:bg-[#e5583d] transition"
+                  disabled={!turnstileToken}
+                  className="w-full bg-[#f26b50] text-white py-3 rounded-lg hover:bg-[#e5583d] transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Enviar
                 </button>

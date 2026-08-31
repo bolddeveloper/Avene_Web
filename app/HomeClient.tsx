@@ -7,6 +7,7 @@ import Header from "@/components/header";
 import Footer from "@/components/footer";
 import Carousel from "@/components/carousel";
 import BestSellers from "@/components/bestSellers";
+import TurnstileWidget from "@/components/turnstile";
 import { storeCards } from "./data/stores";
 
 
@@ -14,18 +15,25 @@ export default function HomeClient() {
   const [showModal, setShowModal] = useState(false);
   const [correo, setCorreo] = useState("");
   const [enviado, setEnviado] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileKey, setTurnstileKey] = useState(0);
 
   const enviarCorreo = async () => {
-    if (!correo) return;
-    const res = await fetch("/api/suscribete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: correo }),
-    });
-    const data = await res.json();
-    if (data.success) { 
-      setEnviado(true);
-      setCorreo("");
+    if (!correo || !turnstileToken) return;
+    try {
+      const res = await fetch("/api/suscribete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: correo, turnstileToken }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEnviado(true);
+        setCorreo("");
+      }
+    } finally {
+      setTurnstileToken("");
+      setTurnstileKey((key) => key + 1);
     }
   };
 
@@ -72,7 +80,9 @@ export default function HomeClient() {
                   className="w-full py-3 pl-6 pr-12 rounded-full border border-[#f0f0f0] text-lg bg-white placeholder:text-[#bbb] focus:outline-none focus:ring-2 focus:ring-[#f07457] transition"
                 />
                 <span
-                  className="absolute top-1/2 right-5 transform -translate-y-1/2 cursor-pointer"
+                  className={`absolute top-1/2 right-5 transform -translate-y-1/2 cursor-pointer ${
+                    turnstileToken ? "" : "opacity-40 pointer-events-none"
+                  }`}
                   onClick={enviarCorreo}
                 >
                   <Image
@@ -87,6 +97,14 @@ export default function HomeClient() {
                     ¡Gracias por suscribirte!
                   </p>
                 )}
+              </div>
+
+              <div className="mt-4">
+                <TurnstileWidget
+                  key={turnstileKey}
+                  onVerify={setTurnstileToken}
+                  onExpire={() => setTurnstileToken("")}
+                />
               </div>
 
             </div>

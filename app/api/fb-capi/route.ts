@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { sanitizeInput } from "@/lib/sanitize";
+import { isValidRequestOrigin } from "@/lib/validate-origin";
 
 const fbEventSchema = z.object({
   event_name: z.string().optional(),
@@ -15,10 +16,7 @@ const fbEventSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const origin = req.headers.get("origin");
-  const allowedOrigins = [env.NEXT_PUBLIC_SITE_URL, "https://avene.guatemala.com"].filter(Boolean);
-  
-  if (origin && !allowedOrigins.some(o => origin.includes(o))) {
+  if (!isValidRequestOrigin(req)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
