@@ -5,9 +5,11 @@ import { env } from "@/lib/env";
 import { sanitizeInput, validateEmail } from "@/lib/sanitize";
 import { checkBrowserRequest } from "@/lib/api-security";
 import { reserveEmail } from "@/lib/email-rate-limit";
+import { verifyTurnstileToken } from "@/lib/verify-turnstile";
 
 const subscribeSchema = z.object({
   email: z.string().email("Invalid email format").max(254),
+  turnstileToken: z.string().min(1, "Security verification is required"),
 });
 
 function getResendClient() {
@@ -37,7 +39,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { email } = parsed.data;
+  const { email, turnstileToken } = parsed.data;
 
   if (!validateEmail(email)) {
     return NextResponse.json({ error: "Invalid email" }, { status: 400 });
@@ -47,6 +49,10 @@ export async function POST(req: Request) {
 
   const limited = await reserveEmail();
   if (limited) return limited;
+
+  if (!(await verifyTurnstileToken(turnstileToken))) {
+    return NextResponse.json({ error: "Security verification failed" }, { status: 403 });
+  }
 
   try {
     const resend = getResendClient();

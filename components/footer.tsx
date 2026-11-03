@@ -2,22 +2,30 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useState } from "react";
+import TurnstileWidget from "@/components/turnstile";
 
 export default function Footer() {
   const [emailFooter, setEmailFooter] = useState("");
   const [footerOk, setFooterOk] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileKey, setTurnstileKey] = useState(0);
 
   const enviarCorreoFooter = async () => {
-    if (!emailFooter) return;
-    const res = await fetch("/api/suscribete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: emailFooter }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      setFooterOk(true);
-      setEmailFooter("");
+    if (!emailFooter || !turnstileToken) return;
+    try {
+      const res = await fetch("/api/suscribete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailFooter, turnstileToken }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFooterOk(true);
+        setEmailFooter("");
+      }
+    } finally {
+      setTurnstileToken("");
+      setTurnstileKey((key) => key + 1);
     }
   };
 
@@ -119,7 +127,9 @@ export default function Footer() {
                 className="w-full py-[8px] pl-4 pr-10 rounded-full border border-[#f0f0f0] text-[16px] bg-white placeholder:text-[#bbb] focus:outline-none focus:ring-1 focus:ring-[#f07457] transition"
               />
               <span
-                className="absolute top-1/2 right-4 transform -translate-y-1/2 cursor-pointer"
+                className={`absolute top-1/2 right-4 transform -translate-y-1/2 cursor-pointer ${
+                  turnstileToken ? "" : "opacity-40 pointer-events-none"
+                }`}
                 onClick={enviarCorreoFooter}
               >
                 <Image
@@ -129,6 +139,13 @@ export default function Footer() {
                   height={18}
                 />
               </span>
+              <div className="mt-3">
+                <TurnstileWidget
+                  key={turnstileKey}
+                  onVerify={setTurnstileToken}
+                  onExpire={() => setTurnstileToken("")}
+                />
+              </div>
               {footerOk && (
                 <p className="text-green-600 text-sm mt-2">
                   ¡Gracias por suscribirte!

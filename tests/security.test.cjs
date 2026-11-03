@@ -13,6 +13,7 @@ const contact = { firstName: 'Ana <', lastName: 'Perez', email: 'ana@example.com
 // separate loaders may share a scope to model independently bundled routes.
 function runtime({
   scope = {}, now = () => Date.now(),
+  turnstileResult = true,
   mailResult = { data: { id: 'test-email' }, error: null },
 } = {}) {
   const cache = new Map();
@@ -28,6 +29,7 @@ function runtime({
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
     }).outputText;
     const localRequire = (id) => {
+      if (id === '@/lib/verify-turnstile') return { verifyTurnstileToken: async () => turnstileResult };
       if (id.startsWith('@/')) return load(id.slice(2) + '.ts');
       if (id === 'resend') return { Resend: class {
         constructor(apiKey) { assert.equal(apiKey, 'test-resend-key'); }
@@ -50,7 +52,9 @@ function runtime({
 function request(route, body, headers = {}) {
   return new Request(origin + '/api/' + route, {
     method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', ...headers },
-    body: typeof body === 'string' ? body : JSON.stringify(body),
+    body: typeof body === 'string' ? body : JSON.stringify(
+      route === 'fb-capi' ? body : { turnstileToken: 'test-token', ...body }
+    ),
   });
 }
 
@@ -118,7 +122,7 @@ test('exact configured origins and JSON charset pass; text/plain and alternate p
   assert.equal(app.sent.length, 0);
 });
 
-test('both forms work with the original Resend key, senders and recipient, without Redis', async () => {
+test('both forms preserve Resend settings with verified Turnstile, without Redis', async () => {
   const app = runtime();
   for (const route of ['send-email', 'suscribete']) {
     const body = route === 'send-email' ? contact : { email: contact.email };
@@ -159,6 +163,34 @@ test('provider rejection never produces a false delivery confirmation', async ()
     assert.equal((await res.json()).success, false);
   }
   assert.equal(app.calls.length, 0);
+});
+
+test('missing or rejected Turnstile stops mail and failed verification consumes local budget', async () => {
+  const app = runtime({ turnstileResult: false });
+  for (const route of ['send-email', 'suscribete']) {
+    const body = route === 'send-email' ? contact : { email: contact.email };
+    const handler = app.load(`app/api/${route}/route.ts`);
+    assert.equal((await handler.POST(request(route, { ...body, turnstileToken: undefined }))).status, 400);
+    assert.equal((await handler.POST(request(route, body))).status, 403);
+  }
+  const reserve = app.load('lib/email-rate-limit.ts').reserveEmail;
+  for (let i = 0; i < 8; i++) assert.equal(await reserve(), null);
+  assert.equal((await reserve()).status, 429);
+  assert.equal(app.sent.length, 0);
+  assert.equal(app.calls.length, 0);
+});
+
+test('production pages retain CSP, Turnstile allowance and security headers', () => {
+  process.env.NODE_ENV = 'production';
+  const { NextRequest } = require('next/server');
+  const response = runtime().load('middleware.ts').middleware(new NextRequest(origin));
+  assert.equal(response.status, 200);
+  const csp = response.headers.get('Content-Security-Policy');
+  assert.ok(csp.includes("frame-ancestors 'none'"));
+  assert.ok(csp.includes('https://challenges.cloudflare.com'));
+  assert.ok(!csp.includes("'unsafe-eval'"));
+  assert.equal(response.headers.get('Referrer-Policy'), 'strict-origin-when-cross-origin');
+  assert.equal(response.headers.get('X-Frame-Options'), 'DENY');
 });
 
 test('retired CAPI forwards no event, including empty and repeated Purchase requests', async () => {

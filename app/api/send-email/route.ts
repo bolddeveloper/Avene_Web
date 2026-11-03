@@ -5,12 +5,14 @@ import { env } from "@/lib/env";
 import { sanitizeInput, validateEmail } from "@/lib/sanitize";
 import { checkBrowserRequest } from "@/lib/api-security";
 import { reserveEmail } from "@/lib/email-rate-limit";
+import { verifyTurnstileToken } from "@/lib/verify-turnstile";
 
 const contactSchema = z.object({
   firstName: z.string().min(1, "First name is required").max(100),
   lastName: z.string().min(1, "Last name is required").max(100),
   email: z.string().email("Invalid email format").max(254),
   message: z.string().min(1, "Message is required").max(5000),
+  turnstileToken: z.string().min(1, "Security verification is required"),
 });
 
 function getResendClient() {
@@ -40,19 +42,23 @@ export async function POST(req: Request) {
     );
   }
 
-  const { firstName, lastName, email, message } = parsed.data;
+  const { firstName, lastName, email, message, turnstileToken } = parsed.data;
 
   if (!validateEmail(email)) {
     return NextResponse.json({ error: "Invalid email" }, { status: 400 });
+  }
+
+  const limited = await reserveEmail();
+  if (limited) return limited;
+
+  if (!(await verifyTurnstileToken(turnstileToken))) {
+    return NextResponse.json({ error: "Security verification failed" }, { status: 403 });
   }
 
   const sanitizedFirstName = sanitizeInput(firstName);
   const sanitizedLastName = sanitizeInput(lastName);
   const sanitizedEmail = sanitizeInput(email);
   const sanitizedMessage = sanitizeInput(message);
-
-  const limited = await reserveEmail();
-  if (limited) return limited;
 
   try {
     const resend = getResendClient();

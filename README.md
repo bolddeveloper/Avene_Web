@@ -14,7 +14,9 @@ Any changes you make to your deployed app will be automatically pushed to this r
 
 ### API security configuration
 
-The forms retain their original Resend connection: the existing server-only `RESEND_API_KEY`, the `noreply@resend.dev` senders, and delivery to `eauthermalavene.guatemala@gmail.com`. No Redis account, credentials or new service is required. Subscription submissions remain email notifications to that inbox; they do not add a contact to a mailing list.
+The forms retain their original Resend connection: the existing server-only `RESEND_API_KEY`, the `noreply@resend.dev` senders, and delivery to `eauthermalavene.guatemala@gmail.com`. No Redis account or credentials are required by the active mail limiter. Subscription submissions remain email notifications to that inbox; they do not add a contact to a mailing list.
+
+The existing remote security changes add Cloudflare Turnstile to all forms. Preserve `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (available at build time) and server-only `TURNSTILE_SECRET_KEY` in the deployment. The site key must authorize the production hostname. Missing or rejected tokens fail closed; no bypass is enabled when keys are absent. The local budget is reserved before both Turnstile verification and Resend delivery, so failed verifications also consume allowance.
 
 The local mail budget has two fixed counters with expiring windows. Defaults are **10 attempts per 60 seconds** and **100 per 24 hours**, combined across contact/subscription handlers that share one JavaScript isolate. Optional `EMAIL_RATE_LIMIT_PER_MINUTE` and `EMAIL_RATE_LIMIT_PER_DAY` can set positive integer limits. Invalid explicit limits return `503`; absent limits use the defaults. Failed provider attempts still consume budget. Request IP headers never create keys or select allowances, so rotating them cannot reset these counters or grow retained state.
 
@@ -24,7 +26,7 @@ Browser POSTs require `application/json` and an exact allowed `Origin`. The prod
 
 `POST /api/fb-capi` is retired (`410` after middleware validation) and performs no external request. The site has no verified purchase workflow or first-party CAPI caller. The existing browser Meta Pixel PageView remains in place. A future CAPI integration must derive events from verified server-side business state.
 
-Run `pnpm test:security` for the regression suite. It uses the actual handlers, a Resend test double and isolated local clocks/state. It sends no network requests and requires no external credentials. It covers successful submissions with only the original Resend configuration, local concurrency, quota expiry and the known separation of allowances between isolates.
+Run `pnpm test:security` for the regression suite. It uses the actual handlers, test doubles for Resend and Turnstile verification, and isolated local clocks/state. It sends no network requests and requires no external credentials. It covers successful submissions with the original Resend configuration and verified challenge, rejected/missing challenges, CSP, local concurrency, quota expiry and the known separation of allowances between isolates.
 
 Your project is live at:
 
