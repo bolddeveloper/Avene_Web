@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { sanitizeInput, validateEmail } from "@/lib/sanitize";
+import { checkBrowserRequest } from "@/lib/api-security";
+import { reserveEmail } from "@/lib/email-rate-limit";
 
 const contactSchema = z.object({
   firstName: z.string().min(1, "First name is required").max(100),
@@ -20,12 +22,8 @@ function getResendClient() {
 }
 
 export async function POST(req: Request) {
-  const origin = req.headers.get("origin");
-  const allowedOrigins = [env.NEXT_PUBLIC_SITE_URL, "https://avene.guatemala.com"].filter(Boolean);
-  
-  if (origin && !allowedOrigins.some(o => origin.includes(o))) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const rejected = checkBrowserRequest(req);
+  if (rejected) return rejected;
 
   let body: unknown;
   try {
@@ -53,6 +51,9 @@ export async function POST(req: Request) {
   const sanitizedEmail = sanitizeInput(email);
   const sanitizedMessage = sanitizeInput(message);
 
+  const limited = await reserveEmail();
+  if (limited) return limited;
+
   try {
     const resend = getResendClient();
     const data = await resend.emails.send({
@@ -67,6 +68,13 @@ export async function POST(req: Request) {
       `,
     });
 
+    if (data.error) {
+      console.error("Email provider rejected contact delivery");
+      return NextResponse.json(
+        { success: false, error: "Failed to send email" },
+        { status: 502 }
+      );
+    }
     return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error("Error al enviar correo:", error);

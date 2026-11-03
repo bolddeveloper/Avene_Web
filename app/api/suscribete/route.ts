@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { sanitizeInput, validateEmail } from "@/lib/sanitize";
+import { checkBrowserRequest } from "@/lib/api-security";
+import { reserveEmail } from "@/lib/email-rate-limit";
 
 const subscribeSchema = z.object({
   email: z.string().email("Invalid email format").max(254),
@@ -17,12 +19,8 @@ function getResendClient() {
 }
 
 export async function POST(req: Request) {
-  const origin = req.headers.get("origin");
-  const allowedOrigins = [env.NEXT_PUBLIC_SITE_URL, "https://avene.guatemala.com"].filter(Boolean);
-  
-  if (origin && !allowedOrigins.some(o => origin.includes(o))) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const rejected = checkBrowserRequest(req);
+  if (rejected) return rejected;
 
   let body: unknown;
   try {
@@ -47,6 +45,9 @@ export async function POST(req: Request) {
 
   const sanitizedEmail = sanitizeInput(email);
 
+  const limited = await reserveEmail();
+  if (limited) return limited;
+
   try {
     const resend = getResendClient();
     const data = await resend.emails.send({
@@ -56,6 +57,13 @@ export async function POST(req: Request) {
       html: `<p><strong>Email suscrito:</strong> ${sanitizedEmail}</p>`,
     });
 
+    if (data.error) {
+      console.error("Email provider rejected subscription delivery");
+      return NextResponse.json(
+        { success: false, error: "Failed to send email" },
+        { status: 502 }
+      );
+    }
     return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error("Error al enviar correo:", error);

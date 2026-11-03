@@ -37,7 +37,8 @@ export function getEnv() {
 
 export const env = new Proxy({} as z.infer<typeof envSchema>, {
   get(_, prop) {
-    const value = getEnv()[prop as keyof typeof envSchema];
+    const values = getEnv();
+    const value = values[prop as keyof typeof values];
     if (value === undefined && prop === "RESEND_API_KEY") {
       throw new Error(`Missing required environment variable: ${String(prop)}`);
     }

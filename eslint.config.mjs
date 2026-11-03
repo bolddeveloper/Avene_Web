@@ -46,6 +46,18 @@ export default [
     },
   },
   {
+    files: ["**/*.cjs", "next-sitemap.config.js"],
+    languageOptions: {
+      sourceType: "commonjs",
+      globals: {
+        require: "readonly", module: "readonly", __dirname: "readonly",
+        process: "readonly", Response: "readonly", Request: "readonly",
+        URL: "readonly", AbortSignal: "readonly", setTimeout: "readonly",
+      },
+    },
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
+  {
     ignores: ["**/node_modules/**", "**/.next/**", "**/out/**", "**/build/**"],
   },
 ];

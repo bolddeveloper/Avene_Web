@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Header from "@/components/header";
@@ -11,7 +11,7 @@ import { storeCards } from "./data/stores";
 
 
 export default function HomeClient() {
-  const [showModal, setShowModal] = useState(false);
+  const [showModal, setShowModal] = useState(true);
   const [correo, setCorreo] = useState("");
   const [enviado, setEnviado] = useState(false);
 
@@ -28,11 +28,6 @@ export default function HomeClient() {
       setCorreo("");
     }
   };
-
-  // Al montar la página, mostramos el popup
-  useEffect(() => {
-    setShowModal(true);
-  }, []);
 
   return (
     <>
